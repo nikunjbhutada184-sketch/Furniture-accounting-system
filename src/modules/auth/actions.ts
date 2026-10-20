@@ -8,12 +8,11 @@ import { signIn, signOut } from "@/server/auth";
  * Sign-in / sign-out server actions.
  *
  * Errors are returned as form state rather than thrown, and are deliberately
- * vague: "Invalid Login Id or Password" never reveals whether the account
- * exists, so the form cannot be used to enumerate users.
+ * vague: "invalid email or password" never reveals whether the account exists.
  */
 
 const signInSchema = z.object({
-  loginId: z.string().trim().min(1, "Login id is required.").max(160),
+  loginId: z.string().min(1, "Login ID is required."),
   password: z.string().min(1, "Password is required."),
   callbackUrl: z.string().optional(),
 });
@@ -55,7 +54,7 @@ export async function signInAction(
     return {};
   } catch (error) {
     if (error instanceof AuthError) {
-      return { error: "Invalid Login Id or Password." };
+      return { error: "Invalid Login Id or Password" };
     }
     // Redirects are signalled by a thrown error; let them propagate.
     throw error;

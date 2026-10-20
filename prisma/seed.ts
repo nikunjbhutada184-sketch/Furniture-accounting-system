@@ -600,29 +600,26 @@ async function main() {
   const accountantEmail = process.env.SEED_ACCOUNTANT_EMAIL ?? "accountant@urbanfurniture.test";
   const accountantPassword = process.env.SEED_ACCOUNTANT_PASSWORD ?? "ChangeMe!123";
 
-  const adminLoginId = process.env.SEED_ADMIN_LOGIN_ID ?? "ufowner";
-  const accountantLoginId = process.env.SEED_ACCOUNTANT_LOGIN_ID ?? "ufaccounts";
-
   const USERS = [
     {
-      loginId: adminLoginId,
       email: adminEmail,
+      loginId: "admin123",
       name: "Urban Furniture Owner",
       role: UserRole.ADMIN,
       password: adminPassword,
       contactId: null as string | null,
     },
     {
-      loginId: accountantLoginId,
       email: accountantEmail,
+      loginId: "accountant123",
       name: "Accountant",
       role: UserRole.ACCOUNTANT,
       password: accountantPassword,
       contactId: null as string | null,
     },
     {
-      loginId: "nimeshp",
       email: "nimesh.pathak@example.test",
+      loginId: "nimesh123",
       name: "Nimesh Pathak",
       role: UserRole.CONTACT,
       password: "ChangeMe!123",
@@ -634,16 +631,10 @@ async function main() {
     const passwordHash = bcrypt.hashSync(user.password, 10);
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {
-        loginId: user.loginId,
-        name: user.name,
-        role: user.role,
-        contactId: user.contactId,
-        isActive: true,
-      },
+      update: { name: user.name, loginId: user.loginId, role: user.role, contactId: user.contactId, isActive: true },
       create: {
-        loginId: user.loginId,
         email: user.email,
+        loginId: user.loginId,
         name: user.name,
         role: user.role,
         passwordHash,
@@ -652,11 +643,11 @@ async function main() {
     });
   }
 
-  console.log(`  Users               ${USERS.map((u) => `${u.loginId} (${u.role})`).join(", ")}`);
+  console.log(`  Users               ${USERS.map((u) => `${u.email} (${u.role})`).join(", ")}`);
   console.log("\nDevelopment logins (change these before any real deployment):");
-  console.log(`  ADMIN       ${adminLoginId} / ${adminPassword}`);
-  console.log(`  ACCOUNTANT  ${accountantLoginId} / ${accountantPassword}`);
-  console.log(`  CONTACT     nimeshp / ChangeMe!123`);
+  console.log(`  ADMIN       ${adminEmail} / ${adminPassword}`);
+  console.log(`  ACCOUNTANT  ${accountantEmail} / ${accountantPassword}`);
+  console.log(`  CONTACT     nimesh.pathak@example.test / ChangeMe!123`);
   console.log("\nSeed complete.\n");
 }
 

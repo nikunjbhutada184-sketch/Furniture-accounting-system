@@ -7,6 +7,7 @@ import {
   PeriodLockedError,
 } from "@/server/errors";
 import { SEQUENCE_CODES, nextNumber } from "@/server/sequence/sequence-service";
+import { toMoney } from "@/server/money";
 import { buildEntry } from "./balance";
 import { type JournalEntryDraft, type PostingContext } from "./types";
 
@@ -159,8 +160,8 @@ export async function createDraftEntry(
           contactId: line.contactId ?? null,
           analyticAccountId: line.analyticAccountId ?? null,
           description: line.description ?? null,
-          debit: line.debit ?? 0,
-          credit: line.credit ?? 0,
+          debit: toMoney(line.debit ?? 0),
+          credit: toMoney(line.credit ?? 0),
           date,
           status: EntryStatus.DRAFT,
           sequence: index,

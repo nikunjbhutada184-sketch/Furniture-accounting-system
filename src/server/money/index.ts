@@ -1,11 +1,12 @@
 import { Prisma } from "@prisma/client";
+import { type Decimal128 } from "mongodb";
 
 /**
  * Money handling.
  *
  * RULE: monetary values are NEVER JavaScript numbers. They are arbitrary
  * precision decimals (`Prisma.Decimal`, which is decimal.js) end to end:
- * Postgres NUMERIC(18,2) -> Prisma.Decimal -> service -> string for the UI.
+ * Database (NUMERIC or BSON Decimal128) -> Prisma.Decimal -> service -> string for the UI.
  *
  * Numbers may only appear at the very edges (parsing raw user input), and are
  * converted immediately via `toMoney`.
@@ -26,21 +27,33 @@ export const ROUNDING = Prisma.Decimal.ROUND_HALF_UP;
 
 export const ZERO: Decimal = new Decimal(0);
 
-export type MoneyInput = Decimal | string | number;
+export type MoneyInput = Decimal | string | number | Decimal128;
 
-/** Coerces raw input into a Decimal rounded to the monetary scale. */
+/** Internal helper converting MoneyInput to Decimal without precision loss */
+function toDec(v: MoneyInput): Decimal {
+  if (v instanceof Decimal) return v;
+  if (typeof v === "object" && v !== null) {
+    return new Decimal(v.toString());
+  }
+  return new Decimal(v);
+}
+
+/**
+ * Coerces any MoneyInput (including MongoDB Decimal128, string, number, or Decimal)
+ * into a Decimal instance rounded to the monetary scale.
+ */
 export function toMoney(value: MoneyInput): Decimal {
-  return round(new Decimal(value), MONEY_SCALE);
+  return round(toDec(value), MONEY_SCALE);
 }
 
 /** Coerces raw input into a Decimal rounded to the quantity scale. */
 export function toQuantity(value: MoneyInput): Decimal {
-  return round(new Decimal(value), QUANTITY_SCALE);
+  return round(toDec(value), QUANTITY_SCALE);
 }
 
 /** Coerces raw input into a Decimal rounded to the unit-price scale. */
 export function toPrice(value: MoneyInput): Decimal {
-  return round(new Decimal(value), PRICE_SCALE);
+  return round(toDec(value), PRICE_SCALE);
 }
 
 export function round(value: Decimal, scale: number = MONEY_SCALE): Decimal {
@@ -48,16 +61,16 @@ export function round(value: Decimal, scale: number = MONEY_SCALE): Decimal {
 }
 
 export function add(a: MoneyInput, b: MoneyInput): Decimal {
-  return round(new Decimal(a).plus(new Decimal(b)));
+  return round(toDec(a).plus(toDec(b)));
 }
 
 export function subtract(a: MoneyInput, b: MoneyInput): Decimal {
-  return round(new Decimal(a).minus(new Decimal(b)));
+  return round(toDec(a).minus(toDec(b)));
 }
 
 /** Sums a list of amounts at monetary scale. Empty list sums to zero. */
 export function sum(values: readonly MoneyInput[]): Decimal {
-  return round(values.reduce<Decimal>((acc, v) => acc.plus(new Decimal(v)), new Decimal(0)));
+  return round(values.reduce<Decimal>((acc, v) => acc.plus(toDec(v)), new Decimal(0)));
 }
 
 /**
@@ -65,48 +78,49 @@ export function sum(values: readonly MoneyInput[]): Decimal {
  * Rounding once at the end (not per operand) keeps document totals consistent.
  */
 export function lineAmount(quantity: MoneyInput, unitPrice: MoneyInput): Decimal {
-  return round(new Decimal(quantity).times(new Decimal(unitPrice)));
+  return round(toDec(quantity).times(toDec(unitPrice)));
 }
 
 /** `base` x `percent`% rounded to the monetary scale. */
 export function percentOf(base: MoneyInput, percent: MoneyInput): Decimal {
-  return round(new Decimal(base).times(new Decimal(percent)).dividedBy(100));
+  return round(toDec(base).times(toDec(percent)).dividedBy(100));
 }
 
 export function isZero(value: MoneyInput): boolean {
-  return new Decimal(value).isZero();
+  return toDec(value).isZero();
 }
 
 export function isNegative(value: MoneyInput): boolean {
-  return new Decimal(value).isNegative() && !new Decimal(value).isZero();
+  const d = toDec(value);
+  return d.isNegative() && !d.isZero();
 }
 
 export function isPositive(value: MoneyInput): boolean {
-  return new Decimal(value).greaterThan(0);
+  return toDec(value).greaterThan(0);
 }
 
 export function equals(a: MoneyInput, b: MoneyInput): boolean {
-  return new Decimal(a).equals(new Decimal(b));
+  return toDec(a).equals(toDec(b));
 }
 
 export function compare(a: MoneyInput, b: MoneyInput): -1 | 0 | 1 {
-  return new Decimal(a).comparedTo(new Decimal(b)) as -1 | 0 | 1;
+  return toDec(a).comparedTo(toDec(b)) as -1 | 0 | 1;
 }
 
 export function max(a: MoneyInput, b: MoneyInput): Decimal {
-  return compare(a, b) >= 0 ? new Decimal(a) : new Decimal(b);
+  return compare(a, b) >= 0 ? toDec(a) : toDec(b);
 }
 
 export function min(a: MoneyInput, b: MoneyInput): Decimal {
-  return compare(a, b) <= 0 ? new Decimal(a) : new Decimal(b);
+  return compare(a, b) <= 0 ? toDec(a) : toDec(b);
 }
 
 export function negate(value: MoneyInput): Decimal {
-  return new Decimal(value).negated();
+  return toDec(value).negated();
 }
 
 export function absolute(value: MoneyInput): Decimal {
-  return new Decimal(value).absoluteValue();
+  return toDec(value).absoluteValue();
 }
 
 /**
@@ -115,7 +129,7 @@ export function absolute(value: MoneyInput): Decimal {
  * that return data to the UI must map amounts through this.
  */
 export function toAmountString(value: MoneyInput): string {
-  return round(new Decimal(value)).toFixed(MONEY_SCALE);
+  return round(toDec(value)).toFixed(MONEY_SCALE);
 }
 
 /**
@@ -132,5 +146,5 @@ export function formatMoney(
     currency,
     minimumFractionDigits: MONEY_SCALE,
     maximumFractionDigits: MONEY_SCALE,
-  }).format(round(new Decimal(value)).toNumber());
+  }).format(toDec(value).toNumber());
 }

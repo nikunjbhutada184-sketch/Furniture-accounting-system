@@ -1,455 +1,187 @@
-import { AlertTriangle, ArrowUpRight } from "lucide-react";
 import { type Metadata } from "next";
-import Link from "next/link";
-import { EmptyState } from "@/components/data-table/empty-state";
-import { Amount } from "@/components/ui/amount";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/ui/stat-card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { type RawSearchParams } from "@/lib/list-params";
-import { IncomeExpenseChart } from "@/modules/reporting/components/income-expense-chart";
-import { PeriodPicker } from "@/modules/reporting/components/period-picker";
-import { QuickAccessCard } from "@/modules/reporting/components/quick-access";
-import {
-  getActiveBudgets,
-  getDashboardOverview,
-  getLedgerHealth,
-  getMonthlySeries,
-  getOpenBills,
-  getOpenInvoices,
-  getQuickAccessSummary,
-  getRecentActivity,
-} from "@/modules/reporting/dashboard-service";
-import { parsePeriod } from "@/modules/reporting/report-service";
-import { auth } from "@/server/auth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requirePermissionOrRedirect } from "@/server/auth/session";
+import { getDashboardMetrics } from "@/server/actions/dashboard";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-/**
- * The accounting dashboard.
- *
- * Every figure comes from the ledger and the document tables through the
- * reporting services. There are no placeholder or illustrative numbers here:
- * an empty database shows empty states, not invented data.
- */
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<RawSearchParams>;
-}) {
-  const actor = await requirePermissionOrRedirect("report:view");
-  const session = await auth();
-  const resolved = await searchParams;
-  const period = parsePeriod(resolved);
+export default async function DashboardPage() {
+  await requirePermissionOrRedirect("report:view");
 
-  const [overview, monthly, activity, invoices, bills, budgets, health, quickAccess] =
-    await Promise.all([
-      getDashboardOverview(period),
-      getMonthlySeries(period),
-      getRecentActivity(),
-      getOpenInvoices(),
-      getOpenBills(),
-      getActiveBudgets(period),
-      getLedgerHealth(period),
-      getQuickAccessSummary(),
-    ]);
-
-  const firstName = (session?.user?.name ?? "there").split(" ")[0];
+  const metrics = await getDashboardMetrics();
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Welcome back, <span className="text-muted-foreground">{firstName}</span>
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Figures for {period.from.toISOString().slice(0, 10)} to{" "}
-            {period.to.toISOString().slice(0, 10)}, straight from the ledger.
-          </p>
-        </div>
-
-        <PeriodPicker
-          from={period.from.toISOString().slice(0, 10)}
-          to={period.to.toISOString().slice(0, 10)}
-        />
+    <div className="mx-auto max-w-5xl space-y-8 p-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-semibold tracking-tight text-center w-full">App Dashboard</h1>
       </div>
 
-      {!health.isBalanced ? (
-        <p
-          role="alert"
-          className="border-destructive/30 bg-destructive/10 text-destructive flex items-start gap-2 rounded-2xl border p-3 text-sm"
-        >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span>
-            The balance sheet does not balance — difference{" "}
-            <span className="tabular font-medium">{health.difference}</span>.{" "}
-            <Link href="/reports/trial-balance" className="underline underline-offset-2">
-              Check the trial balance
-            </Link>
-            .
-          </span>
-        </p>
-      ) : null}
+      <div className="flex justify-center w-full">
+        <NavigationMenu>
+          <NavigationMenuList className="gap-2">
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="text-base bg-transparent hover:bg-accent/50">Sales</NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="flex flex-col gap-1 p-3 w-48">
+                  <Link href="/sales" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Sales order</NavigationMenuLink>
+                  </Link>
+                  <Link href="/sales/invoices" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Sale Invoice</NavigationMenuLink>
+                  </Link>
+                  <Link href="/sales/receipts" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Receipt</NavigationMenuLink>
+                  </Link>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <QuickAccessCard
-          title="Sales"
-          action={{ label: "New", href: "/sales/orders/new" }}
-          tiles={[
-            { label: "All", value: quickAccess.sales.all, href: "/sales/orders" },
-            {
-              label: "Confirmed",
-              value: quickAccess.sales.confirmed,
-              href: "/sales/orders?status=CONFIRMED",
-            },
-            {
-              label: "Draft",
-              value: quickAccess.sales.draft,
-              href: "/sales/orders?status=DRAFT",
-            },
-          ]}
-          footnote="Totals across all time — each tile opens the list it counts. The period above drives the figures below."
-        />
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="text-base bg-transparent hover:bg-accent/50">Purchase</NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="flex flex-col gap-1 p-3 w-48">
+                  <Link href="/purchases" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Purchase Order</NavigationMenuLink>
+                  </Link>
+                  <Link href="/purchases/bills" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Purchase Bill</NavigationMenuLink>
+                  </Link>
+                  <Link href="/purchases/payments" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Payment</NavigationMenuLink>
+                  </Link>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
 
-        <QuickAccessCard
-          title="Purchase"
-          action={{ label: "New", href: "/purchases/orders/new" }}
-          tiles={[
-            { label: "All", value: quickAccess.purchase.all, href: "/purchases/orders" },
-            {
-              label: "Confirmed",
-              value: quickAccess.purchase.confirmed,
-              href: "/purchases/orders?status=CONFIRMED",
-            },
-            {
-              label: "Draft",
-              value: quickAccess.purchase.draft,
-              href: "/purchases/orders?status=DRAFT",
-            },
-          ]}
-          footnote="Totals across all time — each tile opens the list it counts. The period above drives the figures below."
-        />
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="text-base bg-transparent hover:bg-accent/50">Account</NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="flex flex-col gap-1 p-3 w-56">
+                  <Link href="/contacts" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Contact</NavigationMenuLink>
+                  </Link>
+                  <Link href="/products" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Product</NavigationMenuLink>
+                  </Link>
+                  <Link href="/analytic/accounts" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Analyticals</NavigationMenuLink>
+                  </Link>
+                  <Link href="/analytic/budgets" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Analytical Budget</NavigationMenuLink>
+                  </Link>
+                  <Link href="/accounts" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Chart of Account</NavigationMenuLink>
+                  </Link>
+                  <Link href="/journals" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Journals</NavigationMenuLink>
+                  </Link>
+                  <Link href="/journals/entries" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Journal Entries</NavigationMenuLink>
+                  </Link>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
 
-        <QuickAccessCard
-          title="Budget Reports"
-          action={{ label: "Report", href: "/reports/budget" }}
-          tiles={[
-            { label: "Budgets", value: quickAccess.budget.count, href: "/budgets" },
-            {
-              label: "Committed",
-              value: quickAccess.budget.committedCount,
-              href: "/reports/budget",
-            },
-            {
-              label: "Achieved",
-              value: quickAccess.budget.achievedCount,
-              href: "/reports/budget",
-            },
-          ]}
-          footnote={
-            <>
-              Planned <Amount value={quickAccess.budget.planned} size="sm" /> · committed{" "}
-              <Amount value={quickAccess.budget.committed} size="sm" /> · achieved{" "}
-              <Amount value={quickAccess.budget.achieved} size="sm" />
-            </>
-          }
-        />
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="text-base bg-transparent hover:bg-accent/50">Report</NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="flex flex-col gap-1 p-3 w-48">
+                  <Link href="/reports/balancesheet" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Balancesheet</NavigationMenuLink>
+                  </Link>
+                  <Link href="/reports/pnl" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Profit and Loss</NavigationMenuLink>
+                  </Link>
+                  <Link href="/reports/budget" legacyBehavior passHref>
+                    <NavigationMenuLink className="block px-3 py-2 hover:bg-accent rounded-md text-sm">Budget Report</NavigationMenuLink>
+                  </Link>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        </NavigationMenu>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Cash & bank"
-          value={overview.cashAndBank}
-          tone="primary"
-          hint={
-            <>
-              Cash <Amount value={overview.cash} size="sm" /> · Bank{" "}
-              {/*
-                No `signed`: that colours a negative red, which is unreadable on
-                this card's green. `Amount` renders the minus sign either way,
-                and "(overdrawn)" below carries the meaning.
-              */}
-              <Amount value={overview.bank} size="sm" />
-              {/*
-                A credit balance on a bank account is an overdraft -- money owed
-                to the bank rather than held there. It is a real position, so it
-                is named rather than hidden or shown as a bare minus sign.
-              */}
-              {Number(overview.bank) < 0 ? " (overdrawn)" : null}
-            </>
-          }
-        />
-        <StatCard
-          label={overview.isProfit ? "Net profit" : "Net loss"}
-          value={overview.netProfit}
-          hint="Income less expenses"
-          href="/reports/profit-and-loss"
-        />
-        <StatCard
-          label="Receivables"
-          value={overview.receivables}
-          hint="Owed by customers"
-          href="/reports/customer-outstanding"
-        />
-        <StatCard
-          label="Payables"
-          value={overview.payables}
-          hint="Owed to vendors"
-          href="/reports/vendor-outstanding"
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-start justify-between space-y-0">
-            <div>
-              <CardTitle className="text-base">Income vs expenses</CardTitle>
-              <CardDescription>Posted movement per month across the period.</CardDescription>
-            </div>
-            <Link
-              href="/reports/profit-and-loss"
-              aria-label="Open the profit and loss report"
-              className="bg-secondary text-muted-foreground hover:text-foreground flex size-8 items-center justify-center rounded-full transition-colors"
-            >
-              <ArrowUpRight className="size-4" aria-hidden />
-            </Link>
+      <div className="grid gap-6 md:max-w-3xl mx-auto">
+        <Card className="shadow-md bg-card/60 backdrop-blur border-border/40">
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <CardTitle className="text-xl">Sales</CardTitle>
+            <Button size="sm">New</Button>
           </CardHeader>
           <CardContent>
-            <IncomeExpenseChart data={monthly} />
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">All</span>
+                <span className="text-2xl font-bold">{metrics.sales.all}</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">Confirmed</span>
+                <span className="text-2xl font-bold">{metrics.sales.confirmed}</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">Draft</span>
+                <span className="text-2xl font-bold">{metrics.sales.draft}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Totals</CardTitle>
-            <CardDescription>For the selected period.</CardDescription>
+        <Card className="shadow-md bg-card/60 backdrop-blur border-border/40">
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <CardTitle className="text-xl">Purchase</CardTitle>
+            <Button size="sm">New</Button>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {[
-              { label: "Total income", value: overview.totalIncome, href: "/sales/invoices" },
-              { label: "Total expenses", value: overview.totalExpenses, href: "/purchases/bills" },
-              { label: "Cash on hand", value: overview.cash, href: "/general-ledger" },
-              { label: "Bank balance", value: overview.bank, href: "/general-ledger" },
-            ].map((row) => (
-              <Link
-                key={row.label}
-                href={row.href}
-                className="hover:bg-secondary/70 -mx-2 flex items-center justify-between rounded-xl px-2 py-1.5 transition-colors"
-              >
-                <span className="text-muted-foreground text-sm">{row.label}</span>
-                <Amount value={row.value} size="sm" />
-              </Link>
-            ))}
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">All</span>
+                <span className="text-2xl font-bold">{metrics.purchase.all}</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">Confirmed</span>
+                <span className="text-2xl font-bold">{metrics.purchase.confirmed}</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">Draft</span>
+                <span className="text-2xl font-bold">{metrics.purchase.draft}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md bg-card/60 backdrop-blur border-border/40">
+          <CardHeader className="flex flex-row items-center justify-between pb-4">
+            <CardTitle className="text-xl">Budget Reports</CardTitle>
+            <Button size="sm">Report</Button>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">Achieved</span>
+                <span className="text-2xl font-bold">{metrics.budget.achieved}</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">Budget</span>
+                <span className="text-2xl font-bold">{metrics.budget.planned}</span>
+              </div>
+              <div className="flex flex-col items-center justify-center p-4 border rounded-2xl shadow-sm bg-background">
+                <span className="text-sm text-muted-foreground font-medium">Committed</span>
+                <span className="text-2xl font-bold">{metrics.budget.committed}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Recent journal entries</CardTitle>
-            <CardDescription>The latest postings to the ledger.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {activity.length === 0 ? (
-              <EmptyState
-                title="Nothing posted yet"
-                description="Post a bill or an invoice and it will appear here."
-                action={{ label: "Customer invoices", href: "/sales/invoices" }}
-              />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Entry</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activity.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>
-                        <Link
-                          href={`/journal-entries/${row.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {row.number}
-                        </Link>
-                        <div className="text-muted-foreground max-w-[16rem] truncate text-xs">
-                          {row.description}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground tabular">
-                        {row.date.toISOString().slice(0, 10)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Amount value={row.amount} size="sm" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Outstanding customer invoices</CardTitle>
-              <CardDescription>Most urgent first.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {invoices.length === 0 ? (
-                <EmptyState
-                  title="Nothing outstanding"
-                  description="Every posted invoice has been paid."
-                  action={{ label: "View invoices", href: "/sales/invoices" }}
-                />
-              ) : (
-                <Table>
-                  <TableBody>
-                    {invoices.map((invoice) => (
-                      <TableRow key={invoice.id}>
-                        <TableCell>
-                          <Link
-                            href={`/sales/invoices/${invoice.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {invoice.number}
-                          </Link>
-                          <div className="text-muted-foreground text-xs">{invoice.contactName}</div>
-                        </TableCell>
-                        <TableCell>
-                          {invoice.isOverdue ? (
-                            <Badge variant="destructive">Overdue</Badge>
-                          ) : (
-                            <span className="text-muted-foreground tabular text-xs">
-                              {invoice.dueDate?.toISOString().slice(0, 10) ?? "—"}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Amount value={invoice.outstanding} size="sm" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Outstanding vendor bills</CardTitle>
-              <CardDescription>What Urban Furniture owes.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {bills.length === 0 ? (
-                <EmptyState
-                  title="Nothing outstanding"
-                  description="Every posted bill has been paid."
-                  action={{ label: "View bills", href: "/purchases/bills" }}
-                />
-              ) : (
-                <Table>
-                  <TableBody>
-                    {bills.map((bill) => (
-                      <TableRow key={bill.id}>
-                        <TableCell>
-                          <Link
-                            href={`/purchases/bills/${bill.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {bill.number}
-                          </Link>
-                          <div className="text-muted-foreground text-xs">{bill.contactName}</div>
-                        </TableCell>
-                        <TableCell>
-                          {bill.isOverdue ? (
-                            <Badge variant="destructive">Overdue</Badge>
-                          ) : (
-                            <span className="text-muted-foreground tabular text-xs">
-                              {bill.dueDate?.toISOString().slice(0, 10) ?? "—"}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Amount value={bill.outstanding} size="sm" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {budgets.length > 0 ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Active budgets</CardTitle>
-            <CardDescription>
-              Committed and achieved are derived from confirmed orders and the posted ledger.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Budget</TableHead>
-                  <TableHead className="text-right">Committed</TableHead>
-                  <TableHead className="text-right">Achieved</TableHead>
-                  <TableHead className="text-right">Achieved %</TableHead>
-                  <TableHead className="text-right">To achieve</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {budgets.map((budget) => (
-                  <TableRow key={budget.id}>
-                    <TableCell>
-                      <Link href={`/budgets/${budget.id}`} className="font-medium hover:underline">
-                        {budget.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Amount value={budget.committed} size="sm" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Amount value={budget.achieved} size="sm" />
-                    </TableCell>
-                    <TableCell className="tabular text-right">
-                      {budget.achievedPercent === null ? "—" : `${budget.achievedPercent}%`}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Amount value={budget.toAchieve} size="sm" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <p className="text-muted-foreground text-xs">
-        Signed in as {actor.role}. Every figure is computed from posted journal entries at request
-        time — nothing on this page is stored or hardcoded.
-      </p>
     </div>
   );
 }
